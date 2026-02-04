@@ -124,7 +124,11 @@ const LoginView: React.FC<LoginProps> = ({ onLogin }) => {
   const [authData, setAuthData] = useState<{name: string, branch: BranchName, role: UserRole, phone: string} | null>(null);
 
   const handleLogin = async () => {
-    if (!username || !password) return;
+    // Validate inputs
+    if (!username.trim() || !password.trim()) {
+        setError('Vui lòng nhập tên đăng nhập và mật khẩu');
+        return;
+    }
     
     setLoading(true);
     setError('');
@@ -261,7 +265,7 @@ const LoginView: React.FC<LoginProps> = ({ onLogin }) => {
 
           <button
             onClick={handleLogin}
-            disabled={!username || !password || loading}
+            disabled={loading}
             className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed mt-2 shadow-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="animate-spin" /> : 'Đăng nhập'}
@@ -2025,67 +2029,99 @@ const DashboardView: React.FC<DashboardViewProps> = ({ user, onAction }) => {
 
   if (isAdmin) {
     return (
-      <div className="space-y-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-          <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 font-bold text-2xl">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Admin Header */}
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-5 relative overflow-hidden border border-gray-700/50">
+           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 rounded-full bg-brand-500/20 blur-3xl"></div>
+           <div className="absolute bottom-0 left-0 -ml-12 -mb-12 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl"></div>
+           
+           <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white font-bold text-2xl border border-white/20 shadow-inner relative z-10">
             A
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Admin Dashboard</h2>
-            <p className="text-gray-500 text-sm">Quản lý hệ thống</p>
+          <div className="relative z-10">
+            <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
+            <p className="text-gray-400 text-sm mt-1 font-medium">Trung tâm kiểm soát Baby Boss</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => onAction('VIEW_DAILY_REPORT')}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-2 text-center group"
-          >
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <FileText size={24} />
-            </div>
-            <span className="font-semibold text-gray-700">Báo cáo Ngày</span>
-          </button>
+        {/* Section: Báo Cáo */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <BarChart3 size={18} className="text-brand-600" />
+            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Thống kê & Báo cáo</h3>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            {/* Daily Report - Highlighted */}
+            <button 
+              onClick={() => onAction('VIEW_DAILY_REPORT')}
+              className="col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 transition-all flex items-center gap-5 group text-left relative overflow-hidden"
+            >
+              <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm relative z-10">
+                <FileText size={28} strokeWidth={1.5} />
+              </div>
+              <div className="relative z-10">
+                <h4 className="font-bold text-gray-800 text-lg group-hover:text-blue-700 transition-colors">Báo Cáo Ngày</h4>
+                <p className="text-sm text-gray-500 mt-1">Xem doanh thu, kho và hao hụt hôm nay</p>
+              </div>
+              <ChevronRight className="ml-auto text-gray-300 group-hover:text-blue-500 relative z-10" />
+            </button>
 
-          <button 
-            onClick={() => onAction('VIEW_WEEKLY_REPORT')}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-2 text-center group"
-          >
-            <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-              <BarChart3 size={24} />
-            </div>
-            <span className="font-semibold text-gray-700">Thống kê Tuần</span>
-          </button>
+            {/* Weekly Report */}
+             <button 
+              onClick={() => onAction('VIEW_WEEKLY_REPORT')}
+              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10 transition-all flex flex-col gap-4 group text-left"
+            >
+              <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:-rotate-3 transition-transform">
+                <BarChart3 size={24} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-800 group-hover:text-purple-700 text-base">Thống kê Tuần</h4>
+                <p className="text-xs text-gray-500 mt-1">Biểu đồ 7 ngày qua</p>
+              </div>
+            </button>
 
-          <button 
-            onClick={() => onAction('VIEW_SHIFT_REPORT')}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-2 text-center group"
-          >
-            <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-              <Layers size={24} />
-            </div>
-            <span className="font-semibold text-gray-700">Lịch sử Ca</span>
-          </button>
+            {/* Shift History */}
+             <button 
+              onClick={() => onAction('VIEW_SHIFT_REPORT')}
+              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10 transition-all flex flex-col gap-4 group text-left"
+            >
+              <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                <Layers size={24} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-800 group-hover:text-orange-700 text-base">Lịch sử Ca</h4>
+                <p className="text-xs text-gray-500 mt-1">Chi tiết từng ca</p>
+              </div>
+            </button>
+          </div>
+        </div>
 
-          <button 
-            onClick={() => onAction('VIEW_STAFF_ATTENDANCE')}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-2 text-center group"
-          >
-            <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center group-hover:bg-teal-100 transition-colors">
-              <Users size={24} />
-            </div>
-            <span className="font-semibold text-gray-700">Chấm công</span>
-          </button>
-
-          <button 
-            onClick={() => onAction('VIEW_WORK_HOURS')}
-            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-2 text-center group"
-          >
-            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-              <History size={24} />
-            </div>
-            <span className="font-semibold text-gray-700">Lịch Sử Công</span>
-          </button>
+        {/* Section: Nhân Sự */}
+        <div className="space-y-4">
+           <div className="flex items-center gap-2 px-1">
+            <Users size={18} className="text-brand-600" />
+            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Quản lý Nhân sự</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+             {/* Staff Attendance */}
+             <button 
+              onClick={() => onAction('VIEW_STAFF_ATTENDANCE')}
+              className="col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/10 transition-all flex items-center gap-5 group text-left relative overflow-hidden"
+            >
+               <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-teal-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="w-14 h-14 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm relative z-10">
+                <Users size={28} strokeWidth={1.5} />
+              </div>
+              <div className="relative z-10">
+                <h4 className="font-bold text-gray-800 text-lg group-hover:text-teal-700 transition-colors">Chấm Công Nhân Viên</h4>
+                <p className="text-sm text-gray-500 mt-1">Kiểm tra giờ làm việc và chuyên cần</p>
+              </div>
+               <ChevronRight className="ml-auto text-gray-300 group-hover:text-teal-500 relative z-10" />
+            </button>
+            
+          </div>
         </div>
       </div>
     );
