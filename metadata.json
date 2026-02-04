@@ -1,0 +1,8 @@
+{
+  "name": "Baby Boss Ops",
+  "description": "Baby Boss Branch Operations management system.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
