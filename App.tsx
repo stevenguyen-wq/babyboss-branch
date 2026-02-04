@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { BRANCHES, isLastShift, ICE_CREAM_FLAVORS, hasStorageFridgeInput } from './constants';
 import { UserSession, BranchName, ActionType, DailyReportData, UserRole, AttendanceRecord, WeeklyStats, ShiftSummary, StaffProfile } from './types';
 import Layout from './components/Layout';
@@ -46,7 +46,8 @@ import {
   Users,
   ChevronDown,
   Droplets,
-  Utensils
+  Utensils,
+  RefreshCw
 } from 'lucide-react';
 
 // --- Helper Components ---
@@ -923,15 +924,30 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-            { text: 'Look at the digital scale in this image. Identify the numeric weight value shown on the display. Return ONLY the number (e.g. 1.25 or 0.8). If you absolutely cannot see a clear number on a screen, return "N/A". Do not return units.' }
+            { text: 'Analyze this image of a digital scale. Locate the main numeric weight display (usually red or black 7-segment numbers). Ignore small unit prices or total prices. Return the specific weight value shown. Return null if the display is off or unreadable.' }
           ]
+        },
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    value: { type: Type.NUMBER, nullable: true }
+                }
+            }
         }
       });
       
-      const text = response.text?.trim();
-      const number = parseFloat(text || '');
+      const jsonStr = response.text?.trim();
+      let number: number | null = null;
+      if (jsonStr) {
+          try {
+             const parsed = JSON.parse(jsonStr);
+             number = parsed.value;
+          } catch (e) { console.error("JSON parse error", e); }
+      }
       
-      setAiReadings(prev => ({ ...prev, [flavor]: !isNaN(number) ? number : null }));
+      setAiReadings(prev => ({ ...prev, [flavor]: (number !== null && !isNaN(number)) ? number : null }));
 
     } catch (error) {
       console.error("AI Verification failed", error);
@@ -953,15 +969,30 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
           contents: {
             parts: [
               { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-              { text: 'Look at this image of ice cream inventory. Identify the number of boxes written on the label OR count the boxes visible for this specific flavor. Return ONLY the integer number (e.g. 3, 5, 10). If you cannot find a clear number or count, return "N/A".' }
+              { text: 'You are an inventory assistant. Analyze this image of ice cream boxes. Task: 1. Look for a HANDWRITTEN number on the box/label indicating quantity (e.g. "5", "10"). 2. If no number is written, count the visible boxes of this type. Return the integer count. Return null if unclear.' }
             ]
-          }
+          },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    value: { type: Type.INTEGER, nullable: true }
+                }
+            }
+        }
         });
         
-        const text = response.text?.trim();
-        const number = parseInt(text || '', 10);
+        const jsonStr = response.text?.trim();
+        let number: number | null = null;
+        if (jsonStr) {
+            try {
+               const parsed = JSON.parse(jsonStr);
+               number = parsed.value;
+            } catch (e) { console.error("JSON parse error", e); }
+        }
         
-        setStorageAiReadings(prev => ({ ...prev, [flavor]: !isNaN(number) ? number : null }));
+        setStorageAiReadings(prev => ({ ...prev, [flavor]: (number !== null && !isNaN(number)) ? number : null }));
   
       } catch (error) {
         console.error("AI Storage Verification failed", error);
@@ -1089,11 +1120,17 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
 
     if (aiVal === null) {
         return (
-            <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-xs text-red-700">
-                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-sm text-red-800 animate-in slide-in-from-top-1 duration-200">
+                <div className="bg-red-100 p-1.5 rounded-full shrink-0 text-red-600">
+                     <AlertTriangle size={16} />
+                </div>
                 <div>
-                    <span className="font-bold block">AI không đọc được số.</span>
-                    <span>Vui lòng chụp lại ảnh rõ nét hoặc nhập tay.</span>
+                    <span className="font-bold block mb-0.5">Không nhận diện được số</span>
+                    <span className="text-red-600/90 text-xs leading-relaxed block">
+                        Ảnh bị mờ hoặc không thấy rõ màn hình cân.
+                        <br/>
+                        👉 <button onClick={() => openCamera(flavor, type)} className="font-semibold underline hover:text-red-800">Chụp lại gần hơn</button> hoặc tự nhập số liệu.
+                    </span>
                 </div>
             </div>
         );
