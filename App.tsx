@@ -788,6 +788,11 @@ interface ReportFormProps {
   onBack: () => void;
 }
 
+type CaptureContext = {
+    flavor: string;
+    type: 'DISPLAY' | 'STORAGE';
+};
+
 const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{message: string, discrepancy?: string} | null>(null);
@@ -798,9 +803,14 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
   const [cashStart, setCashStart] = useState<string>('');
   const [tempDisplay, setTempDisplay] = useState<string>('');
   const [tempStorage, setTempStorage] = useState<string>('');
+  
+  // Inventory (Display) States
   const [inventory, setInventory] = useState<Record<string, string>>({});
   const [inventoryImages, setInventoryImages] = useState<Record<string, string>>({});
+  
+  // Storage Count States
   const [storageCounts, setStorageCounts] = useState<Record<string, string>>({});
+  const [storageImages, setStorageImages] = useState<Record<string, string>>({});
   
   // Dynamic List States
   const [selectedDisplayFlavors, setSelectedDisplayFlavors] = useState<string[]>([]);
@@ -810,9 +820,15 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
 
   // AI Verification State
   const [showCamera, setShowCamera] = useState(false);
-  const [activeFlavor, setActiveFlavor] = useState<string | null>(null);
+  const [activeCaptureContext, setActiveCaptureContext] = useState<CaptureContext | null>(null);
+  
+  // Verification for Display (Weights - Float)
   const [verifying, setVerifying] = useState<Record<string, boolean>>({});
   const [aiReadings, setAiReadings] = useState<Record<string, number | null>>({});
+
+  // Verification for Storage (Counts - Integer)
+  const [verifyingStorage, setVerifyingStorage] = useState<Record<string, boolean>>({});
+  const [storageAiReadings, setStorageAiReadings] = useState<Record<string, number | null>>({});
 
   // Di An Extras
   const [diAnExtras, setDiAnExtras] = useState<any>({});
@@ -881,6 +897,10 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
     const newCounts = { ...storageCounts };
     delete newCounts[flavor];
     setStorageCounts(newCounts);
+    
+    const newImages = { ...storageImages };
+    delete newImages[flavor];
+    setStorageImages(newImages);
   };
 
   const availableDisplayFlavors = useMemo(() => 
@@ -891,6 +911,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
     ICE_CREAM_FLAVORS.filter(f => !selectedStorageFlavors.includes(f)), 
   [selectedStorageFlavors]);
 
+  // AI Logic for Display (Weight)
   const verifyWeightWithAI = async (flavor: string, base64Image: string) => {
     const base64Data = base64Image.split(',')[1] || base64Image;
     setVerifying(prev => ({ ...prev, [flavor]: true }));
@@ -901,15 +922,8 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         model: 'gemini-3-flash-preview',
         contents: {
           parts: [
-            {
-              inlineData: {
-                mimeType: 'image/jpeg',
-                data: base64Data
-              }
-            },
-            {
-              text: 'Look at the digital scale in this image. Identify the numeric weight value shown on the display. Return ONLY the number (e.g. 1.25 or 0.8). If you absolutely cannot see a clear number on a screen, return "N/A". Do not return units.'
-            }
+            { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+            { text: 'Look at the digital scale in this image. Identify the numeric weight value shown on the display. Return ONLY the number (e.g. 1.25 or 0.8). If you absolutely cannot see a clear number on a screen, return "N/A". Do not return units.' }
           ]
         }
       });
@@ -917,33 +931,66 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
       const text = response.text?.trim();
       const number = parseFloat(text || '');
       
-      if (!isNaN(number)) {
-        setAiReadings(prev => ({ ...prev, [flavor]: number }));
-      } else {
-        setAiReadings(prev => ({ ...prev, [flavor]: null }));
-      }
+      setAiReadings(prev => ({ ...prev, [flavor]: !isNaN(number) ? number : null }));
 
     } catch (error) {
       console.error("AI Verification failed", error);
+      setAiReadings(prev => ({ ...prev, [flavor]: null }));
     } finally {
       setVerifying(prev => ({ ...prev, [flavor]: false }));
     }
   };
+
+  // AI Logic for Storage (Count)
+  const verifyStorageWithAI = async (flavor: string, base64Image: string) => {
+      const base64Data = base64Image.split(',')[1] || base64Image;
+      setVerifyingStorage(prev => ({ ...prev, [flavor]: true }));
+      
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const response: GenerateContentResponse = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: {
+            parts: [
+              { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+              { text: 'Look at this image of ice cream inventory. Identify the number of boxes written on the label OR count the boxes visible for this specific flavor. Return ONLY the integer number (e.g. 3, 5, 10). If you cannot find a clear number or count, return "N/A".' }
+            ]
+          }
+        });
+        
+        const text = response.text?.trim();
+        const number = parseInt(text || '', 10);
+        
+        setStorageAiReadings(prev => ({ ...prev, [flavor]: !isNaN(number) ? number : null }));
   
-  const openCamera = (flavor: string) => {
-    setActiveFlavor(flavor);
+      } catch (error) {
+        console.error("AI Storage Verification failed", error);
+        setStorageAiReadings(prev => ({ ...prev, [flavor]: null }));
+      } finally {
+        setVerifyingStorage(prev => ({ ...prev, [flavor]: false }));
+      }
+    };
+  
+  const openCamera = (flavor: string, type: 'DISPLAY' | 'STORAGE') => {
+    setActiveCaptureContext({ flavor, type });
     setShowCamera(true);
   };
 
   const handleCameraCapture = (imageSrc: string) => {
-    if (activeFlavor) {
-      setInventoryImages(prev => ({ ...prev, [activeFlavor]: imageSrc }));
-      setShowCamera(false);
+    if (activeCaptureContext) {
+      const { flavor, type } = activeCaptureContext;
       
-      // Trigger AI verification immediately
-      verifyWeightWithAI(activeFlavor, imageSrc);
+      if (type === 'DISPLAY') {
+          setInventoryImages(prev => ({ ...prev, [flavor]: imageSrc }));
+          verifyWeightWithAI(flavor, imageSrc);
+      } else {
+          setStorageImages(prev => ({ ...prev, [flavor]: imageSrc }));
+          verifyStorageWithAI(flavor, imageSrc);
+      }
+      
+      setShowCamera(false);
     } else {
-      // Test mode: just close camera
+      // Test mode
       setShowCamera(false);
     }
   };
@@ -954,9 +1001,37 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
 
   const handleSubmit = async () => {
     setLoading(true);
+
+    // --- Blocking Logic for Storage Discrepancies ---
+    const discrepancies: string[] = [];
+    selectedStorageFlavors.forEach(flavor => {
+        const aiVal = storageAiReadings[flavor];
+        const manualVal = parseInt(storageCounts[flavor] || '0', 10);
+        
+        // Block only if AI successfully read a number AND it differs from manual input
+        if (aiVal !== undefined && aiVal !== null && aiVal !== manualVal) {
+            discrepancies.push(`- ${flavor}: Bạn nhập ${manualVal}, AI đọc được ${aiVal}`);
+        }
+    });
+
+    if (discrepancies.length > 0) {
+        alert("⚠️ PHÁT HIỆN SAI LỆCH TỦ TRỮ!\n\nSố liệu bạn nhập không khớp với ảnh chụp. Vui lòng kiểm tra lại:\n" + discrepancies.join("\n"));
+        setLoading(false);
+        return; // BLOCK SUBMISSION
+    }
+
+    // Merge storage images into main images map with a suffix if needed, 
+    // or just rely on backend to handle if keys collide (assuming distinct logic might be needed later).
+    // For now, simple merge. Note: If a flavor is in both lists, one image overrides.
+    // Ideally, we should prefix keys. e.g. "Vani_STORAGE".
+    const mergedImages = { ...inventoryImages };
+    Object.entries(storageImages).forEach(([k, v]) => {
+        mergedImages[`${k}_STORAGE`] = v;
+    });
+
     try {
       const data = {
-        reportId, // Include generated ID
+        reportId, 
         cashStart: parseFloat(cashStart),
         tempDisplay: parseFloat(tempDisplay),
         tempStorage: parseFloat(tempStorage),
@@ -964,7 +1039,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         storageCount: Object.fromEntries(
             Object.entries(storageCounts).map(([k, v]) => [k, parseInt(v as string) || 0])
         ),
-        images: inventoryImages,
+        images: mergedImages,
         diAnExtras: isDiAn ? diAnExtras : undefined
       };
       
@@ -979,12 +1054,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
 
   const getVerificationStatus = (flavor: string) => {
     if (verifying[flavor]) return 'loading';
-    
-    // Only return status if we have a reading attempt
     if (flavor in aiReadings) {
         const ai = aiReadings[flavor];
         if (ai === null) return 'error';
-        
         if (inventory[flavor]) {
              const manual = parseFloat(inventory[flavor]);
              const diff = Math.abs(manual - ai);
@@ -994,13 +1066,28 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
     return 'none';
   };
 
-  // Helper to render AI status
-  const renderAIStatus = (flavor: string) => {
-    if (verifying[flavor]) return null; // handled by badge
+  const getStorageVerificationStatus = (flavor: string) => {
+    if (verifyingStorage[flavor]) return 'loading';
+    if (flavor in storageAiReadings) {
+        const ai = storageAiReadings[flavor];
+        if (ai === null) return 'error';
+        if (storageCounts[flavor]) {
+             const manual = parseInt(storageCounts[flavor], 10);
+             return manual === ai ? 'match' : 'mismatch';
+        }
+    }
+    return 'none';
+  };
 
-    const ai = aiReadings[flavor];
-    
-    if (ai === null) {
+  const renderAIStatus = (flavor: string, type: 'DISPLAY' | 'STORAGE') => {
+    const isStorage = type === 'STORAGE';
+    const isVerifying = isStorage ? verifyingStorage[flavor] : verifying[flavor];
+    const aiVal = isStorage ? storageAiReadings[flavor] : aiReadings[flavor];
+    const manualVal = isStorage ? storageCounts[flavor] : inventory[flavor];
+
+    if (isVerifying) return null;
+
+    if (aiVal === null) {
         return (
             <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2 text-xs text-red-700">
                 <AlertTriangle size={14} className="shrink-0 mt-0.5" />
@@ -1012,12 +1099,13 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         );
     }
     
-    if (ai !== undefined && inventory[flavor]) {
-       const manual = parseFloat(inventory[flavor]);
-       const diff = Math.abs(manual - ai);
+    if (aiVal !== undefined && manualVal) {
+       const manualNum = parseFloat(manualVal);
+       const diff = Math.abs(manualNum - aiVal);
+       const threshold = isStorage ? 0 : 0.05; // Integer match for storage, float margin for display
        
-       if (diff > 0.05) {
-         return <div className="flex items-center gap-1 text-xs text-orange-600 mt-1 font-medium"><AlertTriangle size={12} /> AI thấy: {ai}kg</div>;
+       if (diff > threshold) {
+         return <div className="flex items-center gap-1 text-xs text-red-600 mt-1 font-bold"><AlertTriangle size={12} /> AI thấy: {aiVal} {isStorage ? 'hộp' : 'kg'} (Lệch!)</div>;
        }
     }
     return null;
@@ -1076,7 +1164,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
              <CameraCapture 
                onCapture={handleCameraCapture} 
                autoStart={true} 
-               label={activeFlavor ? `Chụp cân: ${activeFlavor}` : "Chụp thử (Test Mode)"} 
+               label={activeCaptureContext ? `Chụp: ${activeCaptureContext.flavor}` : "Chụp thử"} 
                facingMode="environment"
              />
           </div>
@@ -1140,14 +1228,14 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         </div>
       </div>
 
-      {/* 2. Ice Cream Inventory */}
+      {/* 2. Ice Cream Inventory (Display) */}
       <div className={sectionCardClass}>
         <div className="flex justify-between items-center border-b pb-3">
             <h3 className="font-bold text-gray-800 text-base flex items-center gap-2">
               <Layers size={18} className="text-brand-600"/> 2. Kiểm kê Kem
             </h3>
             <button 
-                onClick={() => { setActiveFlavor(null); setShowCamera(true); }}
+                onClick={() => { setActiveCaptureContext(null); setShowCamera(true); }}
                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors font-medium"
             >
                 <ScanEye size={16} /> Test Camera
@@ -1243,7 +1331,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
                   </div>
                   
                   <button 
-                    onClick={() => openCamera(flavor)}
+                    onClick={() => openCamera(flavor, 'DISPLAY')}
                     className={`flex items-center justify-center w-14 rounded-xl transition-all shadow-sm active:scale-95 border ${
                       inventoryImages[flavor] 
                         ? 'bg-white border-green-500 p-0.5' 
@@ -1261,7 +1349,7 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
                     )}
                  </button>
               </div>
-              {renderAIStatus(flavor)}
+              {renderAIStatus(flavor, 'DISPLAY')}
             </div>
           )})}
         </div>
@@ -1299,35 +1387,89 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
         )}
 
         <div className="grid grid-cols-1 gap-3">
-          {selectedStorageFlavors.map(flavor => (
+          {selectedStorageFlavors.map(flavor => {
+            const status = getStorageVerificationStatus(flavor);
+             
+            let inputBorderClass = "border-gray-200 focus:ring-brand-200 focus:border-brand-400";
+            if (status === 'match') inputBorderClass = "border-green-500 focus:ring-green-200 focus:border-green-500 bg-green-50/50";
+            else if (status === 'mismatch') inputBorderClass = "border-orange-500 focus:ring-orange-200 focus:border-orange-500 bg-orange-50/50";
+            else if (status === 'error') inputBorderClass = "border-red-300 focus:ring-red-200 focus:border-red-500 bg-red-50/50";
+            else if (status === 'loading') inputBorderClass = "border-blue-300 focus:ring-blue-200 focus:border-blue-500 bg-blue-50/50";
+
+            return (
             <div key={flavor} className={itemCardClass}>
-               <div className="flex items-center gap-3">
-                   <div className="flex-1">
-                      <p className="text-sm font-bold text-gray-800 mb-1">{flavor}</p>
+               <div className="flex justify-between items-start mb-2">
+                   <div className="flex flex-col">
+                      <span className="font-bold text-gray-800 text-base">{flavor}</span>
+                      {status !== 'none' && (
+                        <div className={`mt-1.5 w-fit flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                            status === 'match' ? 'bg-green-100 text-green-700 border-green-200' : 
+                            status === 'mismatch' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                            status === 'error' ? 'bg-red-100 text-red-700 border-red-200' :
+                            'bg-blue-50 text-blue-600 border-blue-100'
+                        }`}>
+                            {status === 'match' && <CheckCircle size={14} strokeWidth={2.5} />}
+                            {status === 'mismatch' && <AlertTriangle size={14} strokeWidth={2.5} />}
+                            {status === 'error' && <X size={14} strokeWidth={2.5} />}
+                            {status === 'loading' && <Loader2 size={14} className="animate-spin" />}
+                            
+                            <span className="uppercase tracking-wide">
+                                {status === 'match' ? 'AI KHỚP' : 
+                                 status === 'mismatch' ? 'AI LỆCH' : 
+                                 status === 'error' ? 'LỖI ĐỌC' : 
+                                 'ĐANG XỬ LÝ'}
+                            </span>
+                        </div>
+                    )}
                    </div>
-                   <div className="flex items-center gap-2">
-                     <div className="relative w-24">
+                   <button 
+                        onClick={() => removeStorageFlavor(flavor)}
+                        className="text-gray-300 hover:text-red-500 p-2"
+                     >
+                        <Trash2 size={16} />
+                   </button>
+               </div>
+
+               <div className="flex gap-3 items-stretch">
+                   <div className="flex-1 relative">
                         <input 
                             type="number" 
                             inputMode="numeric"
                             pattern="[0-9]*"
                             placeholder="0"
-                            className="w-full px-3 py-2 text-center font-bold text-gray-800 border border-gray-200 rounded-lg focus:border-brand-500 outline-none"
+                            className={`w-full h-full pl-4 pr-10 py-3 text-lg font-bold rounded-xl border focus:ring-2 outline-none transition-all ${inputBorderClass}`}
                             value={storageCounts[flavor] || ''}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleStorageCountChange(flavor, e.target.value)}
                         />
-                     </div>
-                     <span className="text-sm font-medium text-gray-500 w-8">hộp</span>
-                     <button 
-                        onClick={() => removeStorageFlavor(flavor)}
-                        className="text-gray-300 hover:text-red-500 p-2"
-                     >
-                        <Trash2 size={16} />
-                     </button>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">hộp</span>
+                         {status === 'loading' && (
+                            <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Loader2 size={18} className="animate-spin text-blue-500" />
+                            </div>
+                        )}
                    </div>
+                   <button 
+                    onClick={() => openCamera(flavor, 'STORAGE')}
+                    className={`flex items-center justify-center w-14 rounded-xl transition-all shadow-sm active:scale-95 border ${
+                      storageImages[flavor] 
+                        ? 'bg-white border-green-500 p-0.5' 
+                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-brand-300 text-gray-400'
+                    }`}
+                  >
+                    {storageImages[flavor] ? (
+                      <img 
+                        src={storageImages[flavor]} 
+                        alt="Evidence" 
+                        className="w-full h-full object-cover rounded-[10px]" 
+                      />
+                    ) : (
+                      <Camera size={22} />
+                    )}
+                 </button>
                </div>
+               {renderAIStatus(flavor, 'STORAGE')}
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
