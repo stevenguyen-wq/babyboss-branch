@@ -266,10 +266,6 @@ const LoginView: React.FC<LoginProps> = ({ onLogin }) => {
           >
             {loading ? <Loader2 className="animate-spin" /> : 'Đăng nhập'}
           </button>
-          
-          <div className="text-center pt-2">
-             <p className="text-xs text-gray-400">TK: admin/123 hoặc staff1/123</p>
-          </div>
         </div>
       </div>
     );
