@@ -919,8 +919,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      // Use gemini-3-pro-preview for better OCR accuracy
       const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: {
           parts: [
             { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -964,8 +965,9 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
       
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        // Use gemini-3-pro-preview for better handwriting/count recognition
         const response: GenerateContentResponse = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3-pro-preview',
           contents: {
             parts: [
               { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
@@ -1589,631 +1591,341 @@ const ReportForm: React.FC<ReportFormProps> = ({ user, type, onBack }) => {
   );
 };
 
-// 6. Stock Actions (Import / Transfer)
-interface StockActionProps {
+// --- Missing Views Implementation ---
+
+interface DashboardProps {
   user: UserSession;
-  type: 'EXPORT_STORAGE' | 'IMPORT_STOCK';
-  onBack: () => void;
+  onAction: (action: ActionType | 'CHECK_OUT') => void;
 }
 
-const StockActionForm: React.FC<StockActionProps> = ({ user, type, onBack }) => {
-  const [items, setItems] = useState<{flavor: string, count: number, weight: string}[]>([{flavor: ICE_CREAM_FLAVORS[0], count: 1, weight: ''}]);
-  const [loading, setLoading] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  const addItem = () => setItems([...items, {flavor: ICE_CREAM_FLAVORS[0], count: 1, weight: ''}]);
-  
-  const updateItem = (index: number, field: 'flavor' | 'count' | 'weight', value: any) => {
-    const newItems = [...items];
-    // @ts-ignore
-    newItems[index][field] = value;
-    setItems(newItems);
-  };
-
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    await submitReport(user, { items }, type);
-    setLoading(false);
-    setCompleted(true);
-  };
-
-  if (completed) {
-    return (
-      <div className="text-center space-y-6 pt-10">
-         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
-            <CheckCircle size={40} />
-          </div>
-          <h2 className="text-2xl font-bold">Thành công!</h2>
-          <p className="text-gray-600">Dữ liệu đã được cập nhật vào hệ thống.</p>
-          <button 
-            onClick={onBack}
-            className="bg-gray-900 text-white px-8 py-3 rounded-xl font-medium shadow-lg"
-          >
-            Về Dashboard
-          </button>
-      </div>
-    );
-  }
-
-  // Common styles
-  const sectionCardClass = "bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4";
-  const itemCardClass = "bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative transition-all hover:shadow-md hover:border-brand-200 mb-4";
-  
-  return (
-    <div className="space-y-6">
-       <ConfirmationModal 
-          isOpen={showConfirm}
-          onClose={() => setShowConfirm(false)}
-          onConfirm={handleSubmit}
-          title="Xác nhận phiếu?"
-          message={`Bạn có chắc chắn muốn gửi phiếu ${type === 'EXPORT_STORAGE' ? 'Xuất Tủ Trữ' : 'Nhập Hàng'} này không?`}
-          confirmLabel="Xác Nhận"
-       />
-
-       <div className="flex items-center gap-2">
-        <button onClick={onBack} className="p-2 -ml-2 text-gray-600">
-           <ArrowLeft />
-        </button>
-        <h2 className="text-xl font-bold">{type === 'EXPORT_STORAGE' ? 'Xuất Tủ Trữ -> Trưng Bày' : 'Nhập Hàng Mới'}</h2>
-      </div>
-
-      <div className={sectionCardClass}>
-        <h3 className="font-bold text-gray-800 border-b pb-3 text-base flex items-center gap-2">
-           <ClipboardList size={18} className="text-brand-600"/> Chi tiết phiếu {type === 'EXPORT_STORAGE' ? 'Xuất' : 'Nhập'}
-        </h3>
-
-        {items.map((item, idx) => (
-          <div key={idx} className={itemCardClass}>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-md">Mục #{idx + 1}</span>
-              {items.length > 1 && (
-                <button onClick={() => removeItem(idx)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors">
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-            
-            <div className="space-y-4">
-               <SelectField 
-                 label="Loại kem"
-                 icon={Layers}
-                 options={ICE_CREAM_FLAVORS}
-                 value={item.flavor}
-                 onChange={(e) => updateItem(idx, 'flavor', e.target.value)}
-               />
-
-              <div className="grid grid-cols-2 gap-4">
-                 <InputField
-                    label="Số lượng (Hộp)"
-                    icon={Package}
-                    type="number" 
-                    min="1"
-                    value={item.count}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem(idx, 'count', parseInt(e.target.value))}
-                 />
-
-                 {type === 'EXPORT_STORAGE' && (
-                     <InputField
-                        label="Trọng lượng (Kg)"
-                        icon={Scale}
-                        type="number" 
-                        step="0.01"
-                        placeholder="0.00"
-                        value={item.weight}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItem(idx, 'weight', e.target.value)}
-                     />
-                 )}
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button 
-          onClick={addItem}
-          className="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-medium hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition-all flex items-center justify-center gap-2"
-        >
-          <Plus size={20} /> Thêm vị kem
-        </button>
-      </div>
-
-      <button
-          onClick={() => setShowConfirm(true)}
-          disabled={loading}
-          className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-xl hover:bg-brand-700 transition-colors"
-        >
-          {loading ? 'Đang xử lý...' : 'XÁC NHẬN'}
-        </button>
-    </div>
-  );
-};
-
-// 7. Daily Report View (New)
-interface DailyReportViewProps {
-  user: UserSession;
-  onBack: () => void;
-}
-
-type SortKey = 'flavor' | 'imported' | 'exported' | 'shrinkage';
-
-const DailyReportView: React.FC<DailyReportViewProps> = ({ user, onBack }) => {
-  const isAdmin = user.role === 'admin';
-  const [selectedBranch, setSelectedBranch] = useState<string>(user.branch);
-  const [data, setData] = useState<DailyReportData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>({ key: 'flavor', direction: 'asc' });
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const result = await getDailyReport(selectedBranch);
-        setData(result);
-      } catch (error) {
-        console.error("Failed to fetch daily report", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [selectedBranch]);
-
-  const sortedInventory = useMemo(() => {
-    if (!data) return [];
-    
-    // Filter first
-    let result = data.inventoryDiff;
-    if (searchQuery.trim()) {
-      const lowerQuery = searchQuery.toLowerCase().trim();
-      result = result.filter(item => item.flavor.toLowerCase().includes(lowerQuery));
-    }
-
-    // Then sort
-    const sortableItems = [...result];
-    
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        // @ts-ignore
-        const aValue = a[sortConfig.key];
-        // @ts-ignore
-        const bValue = b[sortConfig.key];
-
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return sortConfig.direction === 'asc' 
-            ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
-        }
-
-        if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [data, sortConfig, searchQuery]);
-
-  const handleSort = (key: SortKey) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig?.key !== column) {
-      return <ArrowUpDown size={14} className="text-gray-300 ml-1 inline" />;
-    }
-    return sortConfig.direction === 'asc' 
-      ? <ArrowUp size={14} className="text-brand-600 ml-1 inline" />
-      : <ArrowDown size={14} className="text-brand-600 ml-1 inline" />;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-500">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 mb-4"></div>
-        <p>Đang tải dữ liệu...</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="text-center pt-10">
-        <p className="text-red-500">Không thể tải báo cáo.</p>
-        <button onClick={onBack} className="mt-4 text-brand-600 underline">Quay lại</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-       <div className="flex items-center gap-2 justify-between">
-        <div className="flex items-center gap-2">
-            <button onClick={onBack} className="p-2 -ml-2 text-gray-600">
-            <ArrowLeft />
-            </button>
-            <div>
-            <h2 className="text-xl font-bold">Báo Cáo Ngày</h2>
-            <p className="text-xs text-gray-500">{data.date}</p>
-            </div>
-        </div>
-        {isAdmin && (
-            <select 
-                value={selectedBranch} 
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg p-1.5 bg-white max-w-[150px]"
-            >
-                {BRANCHES.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-            </select>
-        )}
-      </div>
-
-      {/* Summary Grid */}
-      <div className="grid grid-cols-2 gap-4">
-          {/* Cash Card */}
-          <div className="col-span-2 bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
-             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white/10 blur-2xl"></div>
-             
-             <div className="flex items-start justify-between relative z-10">
-                <div>
-                  <p className="text-brand-100 text-sm font-medium mb-1">Tổng tiền mặt</p>
-                  <h3 className="text-3xl font-bold tracking-tight">{data.totalCash.toLocaleString('vi-VN')} ₫</h3>
-                </div>
-                <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
-                   <DollarSign size={24} className="text-white" />
-                </div>
-             </div>
-          </div>
-
-          {/* Storage Boxes */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
-              <div className="flex items-start justify-between mb-2">
-                 <span className="text-xs font-semibold text-gray-500 uppercase">Tủ Trữ</span>
-                 <div className="bg-orange-50 p-2 rounded-lg text-orange-600">
-                    <Archive size={18} />
-                 </div>
-              </div>
-              <div>
-                 <h4 className="text-2xl font-bold text-gray-800">{data.totalStorageBoxes}</h4>
-                 <p className="text-xs text-gray-500 font-medium">Hộp kem</p>
-              </div>
-          </div>
-
-          {/* Display Weight */}
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
-              <div className="flex items-start justify-between mb-2">
-                 <span className="text-xs font-semibold text-gray-500 uppercase">Trưng Bày</span>
-                 <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
-                    <Scale size={18} /> 
-                 </div>
-              </div>
-              <div>
-                 <h4 className="text-2xl font-bold text-gray-800">{data.totalDisplayWeight}</h4>
-                 <p className="text-xs text-gray-500 font-medium">Kg kem</p>
-              </div>
-          </div>
-
-          {/* Shrinkage */}
-          <div className="col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-               <div>
-                  <span className="text-xs font-semibold text-gray-500 uppercase block mb-1">Tổng Hao Hụt</span>
-                  <div className={`text-xl font-bold ${data.totalShrinkage < 0 ? 'text-red-500' : 'text-gray-800'}`}>
-                     {data.totalShrinkage} kg
-                  </div>
-               </div>
-               <div className={`p-3 rounded-xl ${data.totalShrinkage < 0 ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-500'}`}>
-                  <TrendingDown size={20} />
-               </div>
-          </div>
-      </div>
-
-      {/* Inventory Diff Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-          <TrendingDown size={18} className="text-gray-500" />
-          <h3 className="font-bold text-gray-800">Biến động kho & Hao hụt</h3>
-        </div>
-
-        {/* Search Input Bar */}
-        <div className="p-3 border-b border-gray-100 bg-gray-50/50">
-          <div className="relative">
-             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-               <Search size={16} />
-             </div>
-             <input 
-               type="text" 
-               placeholder="Tìm kiếm vị kem..." 
-               value={searchQuery}
-               onChange={(e) => setSearchQuery(e.target.value)}
-               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-white"
-             />
-             {searchQuery && (
-               <button 
-                 onClick={() => setSearchQuery('')}
-                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-               >
-                 <X size={14} />
-               </button>
-             )}
-          </div>
-        </div>
-        
-        {data.inventoryDiff.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">
-            Không có dữ liệu biến động cho ngày hôm nay.
-          </div>
-        ) : sortedInventory.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 text-sm">
-            Không tìm thấy vị kem nào phù hợp với "{searchQuery}".
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-500 uppercase bg-gray-50">
-                <tr>
-                  <th 
-                    className="px-4 py-3 font-medium cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                    onClick={() => handleSort('flavor')}
-                  >
-                    Vị kem <SortIcon column="flavor" />
-                  </th>
-                  <th 
-                    className="px-4 py-3 font-medium text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                    onClick={() => handleSort('imported')}
-                  >
-                    Nhập <SortIcon column="imported" />
-                  </th>
-                  <th 
-                    className="px-4 py-3 font-medium text-center cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                    onClick={() => handleSort('exported')}
-                  >
-                    Xuất <SortIcon column="exported" />
-                  </th>
-                  <th 
-                    className="px-4 py-3 font-medium text-right cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                    onClick={() => handleSort('shrinkage')}
-                  >
-                    Hao hụt <SortIcon column="shrinkage" />
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sortedInventory.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{item.flavor}</td>
-                    <td className="px-4 py-3 text-center text-gray-600">
-                      {item.imported > 0 ? <span className="text-green-600">+{item.imported}</span> : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-center text-gray-600">
-                      {item.exported > 0 ? <span className="text-blue-600">-{item.exported}</span> : '-'}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-medium ${item.shrinkage < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                      {item.shrinkage !== 0 ? `${item.shrinkage} kg` : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-       <div className="text-center text-xs text-gray-400 pt-4 pb-8">
-        Số liệu được tính toán dựa trên báo cáo của các ca trong ngày và so sánh với dữ liệu ngày hôm trước.
-      </div>
-    </div>
-  );
-};
-
-// 8. Dashboard View (Missing in previous code)
-interface DashboardViewProps {
-  user: UserSession;
-  onAction: (action: ActionType) => void;
-}
-
-const DashboardView: React.FC<DashboardViewProps> = ({ user, onAction }) => {
+const DashboardView: React.FC<DashboardProps> = ({ user, onAction }) => {
   const isAdmin = user.role === 'admin';
   const branchConfig = BRANCHES.find(b => b.name === user.branch);
   const hasStorage = branchConfig?.hasStorageFridge;
 
-  if (isAdmin) {
-    return (
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Admin Header */}
-        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-5 relative overflow-hidden border border-gray-700/50">
-           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 rounded-full bg-brand-500/20 blur-3xl"></div>
-           <div className="absolute bottom-0 left-0 -ml-12 -mb-12 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl"></div>
-           
-           <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white font-bold text-2xl border border-white/20 shadow-inner relative z-10">
-            A
-          </div>
-          <div className="relative z-10">
-            <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
-            <p className="text-gray-400 text-sm mt-1 font-medium">Trung tâm kiểm soát Baby Boss</p>
-          </div>
-        </div>
-
-        {/* Section: Báo Cáo */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-1">
-            <BarChart3 size={18} className="text-brand-600" />
-            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Thống kê & Báo cáo</h3>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            {/* Daily Report - Highlighted */}
-            <button 
-              onClick={() => onAction('VIEW_DAILY_REPORT')}
-              className="col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 transition-all flex items-center gap-5 group text-left relative overflow-hidden"
-            >
-              <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm relative z-10">
-                <FileText size={28} strokeWidth={1.5} />
-              </div>
-              <div className="relative z-10">
-                <h4 className="font-bold text-gray-800 text-lg group-hover:text-blue-700 transition-colors">Báo Cáo Ngày</h4>
-                <p className="text-sm text-gray-500 mt-1">Xem doanh thu, kho và hao hụt hôm nay</p>
-              </div>
-              <ChevronRight className="ml-auto text-gray-300 group-hover:text-blue-500 relative z-10" />
-            </button>
-
-            {/* Weekly Report */}
-             <button 
-              onClick={() => onAction('VIEW_WEEKLY_REPORT')}
-              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10 transition-all flex flex-col gap-4 group text-left"
-            >
-              <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:-rotate-3 transition-transform">
-                <BarChart3 size={24} strokeWidth={1.5} />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 group-hover:text-purple-700 text-base">Thống kê Tuần</h4>
-                <p className="text-xs text-gray-500 mt-1">Biểu đồ 7 ngày qua</p>
-              </div>
-            </button>
-
-            {/* Shift History */}
-             <button 
-              onClick={() => onAction('VIEW_SHIFT_REPORT')}
-              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10 transition-all flex flex-col gap-4 group text-left"
-            >
-              <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                <Layers size={24} strokeWidth={1.5} />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 group-hover:text-orange-700 text-base">Lịch sử Ca</h4>
-                <p className="text-xs text-gray-500 mt-1">Chi tiết từng ca</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Section: Nhân Sự */}
-        <div className="space-y-4">
-           <div className="flex items-center gap-2 px-1">
-            <Users size={18} className="text-brand-600" />
-            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Quản lý Nhân sự</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-             {/* Staff Attendance */}
-             <button 
-              onClick={() => onAction('VIEW_STAFF_ATTENDANCE')}
-              className="col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/10 transition-all flex items-center gap-5 group text-left relative overflow-hidden"
-            >
-               <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-teal-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="w-14 h-14 bg-teal-100 text-teal-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm relative z-10">
-                <Users size={28} strokeWidth={1.5} />
-              </div>
-              <div className="relative z-10">
-                <h4 className="font-bold text-gray-800 text-lg group-hover:text-teal-700 transition-colors">Chấm Công Nhân Viên</h4>
-                <p className="text-sm text-gray-500 mt-1">Kiểm tra giờ làm việc và chuyên cần</p>
-              </div>
-               <ChevronRight className="ml-auto text-gray-300 group-hover:text-teal-500 relative z-10" />
-            </button>
-            
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="bg-brand-600 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-6 -mt-6 w-32 h-32 rounded-full bg-white/10 blur-2xl"></div>
-        <p className="text-brand-100 text-sm mb-1">Xin chào,</p>
-        <h2 className="text-2xl font-bold">{user.name}</h2>
-        {user.phone && <p className="text-brand-200 text-sm font-medium">{user.phone}</p>}
-        <div className="flex items-center gap-2 mt-4 text-xs font-medium bg-white/20 w-fit px-3 py-1.5 rounded-lg backdrop-blur-sm">
-          <Clock size={14} />
-          Check-in: {user.checkInTime ? new Date(user.checkInTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '--:--'}
-        </div>
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+         <div>
+            <h2 className="text-xl font-bold text-gray-800">Xin chào, {user.name}</h2>
+            <p className="text-gray-500 text-sm mt-1">{user.branch} • Ca {user.shift}</p>
+         </div>
+         <div className="bg-brand-50 text-brand-600 p-3 rounded-full">
+            <User size={24} />
+         </div>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="font-bold text-gray-800 text-lg">Hoạt động Ca {user.shift}</h3>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => onAction('REPORT_START')}
-            className="col-span-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-3 text-center group"
-          >
-            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <ClipboardList size={24} />
-            </div>
-            <span className="font-semibold text-gray-700 text-sm">Báo Cáo<br/>Đầu Ca</span>
-          </button>
+      <div className="grid grid-cols-2 gap-4">
+        {/* Staff Actions */}
+        {!isAdmin && (
+            <>
+                <button 
+                  onClick={() => onAction('REPORT_START')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+                        <ClipboardList size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Báo Cáo Đầu Ca</span>
+                </button>
 
-          <button 
-            onClick={() => onAction('REPORT_END')}
-            className="col-span-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-3 text-center group"
-          >
-            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-              <CheckCircle size={24} />
-            </div>
-            <span className="font-semibold text-gray-700 text-sm">Báo Cáo<br/>Cuối Ca</span>
-          </button>
-          
-          {hasStorage && (
-            <button 
-              onClick={() => onAction('EXPORT_STORAGE')}
-              className="col-span-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-3 text-center group"
-            >
-              <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                <Upload size={24} />
-              </div>
-              <span className="font-semibold text-gray-700 text-sm">Xuất Tủ Trữ<br/>Ra Quầy</span>
-            </button>
-          )}
+                <button 
+                  onClick={() => onAction('REPORT_END')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center">
+                        <FileText size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Báo Cáo Cuối Ca</span>
+                </button>
 
-          <button 
-            onClick={() => onAction('IMPORT_STOCK')}
-            className="col-span-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-3 text-center group"
-          >
-            <div className="w-12 h-12 bg-green-50 text-green-600 rounded-full flex items-center justify-center group-hover:bg-green-100 transition-colors">
-              <Download size={24} />
-            </div>
-            <span className="font-semibold text-gray-700 text-sm">Nhập Hàng<br/>Mới</span>
-          </button>
-        </div>
-      </div>
+                {hasStorage && (
+                    <button 
+                    onClick={() => onAction('EXPORT_STORAGE')}
+                    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                    >
+                        <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center">
+                            <Archive size={24} />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Xuất Tủ Trữ</span>
+                    </button>
+                )}
 
-      <div className="space-y-4">
-        <h3 className="font-bold text-gray-800 text-lg">Cá nhân</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => onAction('VIEW_WORK_HOURS')}
-            className="col-span-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:border-brand-500 transition-all flex flex-col items-center gap-3 text-center group"
-          >
-            <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center group-hover:bg-teal-100 transition-colors">
-              <History size={24} />
-            </div>
-            <span className="font-semibold text-gray-700 text-sm">Lịch Sử Công</span>
-          </button>
+                <button 
+                  onClick={() => onAction('IMPORT_STOCK')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-green-50 text-green-600 rounded-full flex items-center justify-center">
+                        <Download size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Nhập Hàng</span>
+                </button>
 
-          <button 
-            onClick={() => onAction('CHECK_OUT')}
-            className="col-span-1 bg-red-50 p-4 rounded-xl shadow-sm border border-red-100 hover:border-red-500 transition-all flex flex-col items-center gap-3 text-center group"
-          >
-            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center group-hover:bg-red-200 transition-colors">
-              <LogOut size={24} />
-            </div>
-            <span className="font-semibold text-red-700 text-sm">Kết Thúc<br/>Ca Làm</span>
-          </button>
-        </div>
+                <button 
+                  onClick={() => onAction('VIEW_WORK_HOURS')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95 col-span-2"
+                >
+                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center">
+                        <Clock size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Xem Giờ Công</span>
+                </button>
+            </>
+        )}
+
+        {/* Admin Actions */}
+        {isAdmin && (
+            <>
+                 <button 
+                  onClick={() => onAction('VIEW_DAILY_REPORT')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+                        <BarChart3 size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Báo Cáo Ngày</span>
+                </button>
+
+                 <button 
+                  onClick={() => onAction('VIEW_WEEKLY_REPORT')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-full flex items-center justify-center">
+                        <Calendar size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Thống Kê Tuần</span>
+                </button>
+                
+                 <button 
+                  onClick={() => onAction('VIEW_SHIFT_REPORT')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-full flex items-center justify-center">
+                        <History size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Lịch Sử Ca</span>
+                </button>
+
+                 <button 
+                  onClick={() => onAction('VIEW_STAFF_ATTENDANCE')}
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 hover:border-brand-300 transition-all active:scale-95"
+                >
+                    <div className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-full flex items-center justify-center">
+                        <Users size={24} />
+                    </div>
+                    <span className="font-bold text-gray-700 text-sm">Chấm Công NV</span>
+                </button>
+            </>
+        )}
       </div>
     </div>
   );
+};
+
+interface StockActionProps {
+  user: UserSession;
+  type: ActionType;
+  onBack: () => void;
+}
+
+const StockActionForm: React.FC<StockActionProps> = ({ user, type, onBack }) => {
+    const [loading, setLoading] = useState(false);
+    const [items, setItems] = useState<{flavor: string, quantity: string}[]>([]);
+    const [currentFlavor, setCurrentFlavor] = useState('');
+    const [currentQuantity, setCurrentQuantity] = useState('');
+    const [result, setResult] = useState<{message: string} | null>(null);
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    const isExport = type === 'EXPORT_STORAGE';
+    const title = isExport ? 'Xuất Tủ Trữ -> Trưng Bày' : 'Nhập Hàng Mới';
+
+    const handleAdd = () => {
+        if(currentFlavor && currentQuantity) {
+            setItems([...items, {flavor: currentFlavor, quantity: currentQuantity}]);
+            setCurrentFlavor('');
+            setCurrentQuantity('');
+        }
+    };
+
+    const handleSubmit = async () => {
+        if(items.length === 0) return;
+        setLoading(true);
+        try {
+             // Structure payload for sheetService
+             const payload = {
+                 items: items.map(i => ({
+                     flavor: i.flavor,
+                     quantity: parseFloat(i.quantity) // Can be boxes or kg depending on context, assuming simplified number
+                 }))
+             };
+             const res = await submitReport(user, payload, type);
+             if(res.success) {
+                 setResult({ message: res.message });
+             } else {
+                 alert(res.message);
+             }
+        } catch (e) {
+            alert('Có lỗi xảy ra');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (result) {
+        return (
+             <div className="text-center space-y-6 pt-10">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+                    <CheckCircle size={40} />
+                </div>
+                <h2 className="text-2xl font-bold">Thành Công!</h2>
+                <p className="text-gray-600">{result.message}</p>
+                <button onClick={onBack} className="bg-gray-900 text-white px-8 py-3 rounded-xl font-medium shadow-lg">
+                    Quay lại
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+             <ConfirmationModal 
+                isOpen={showConfirm}
+                onClose={() => setShowConfirm(false)}
+                onConfirm={handleSubmit}
+                title="Xác nhận phiếu?"
+                message={`Bạn có chắc chắn muốn gửi phiếu ${isExport ? 'Xuất Tủ Trữ' : 'Nhập Hàng'} này không?`}
+                confirmLabel="Gửi Ngay"
+             />
+
+             <div className="flex items-center gap-2">
+                <button onClick={onBack} className="p-2 -ml-2 text-gray-600"><ArrowLeft /></button>
+                <h2 className="text-xl font-bold">{title}</h2>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <SelectField 
+                    label="Chọn Vị Kem"
+                    icon={Layers}
+                    options={ICE_CREAM_FLAVORS}
+                    value={currentFlavor}
+                    onChange={e => setCurrentFlavor(e.target.value)}
+                    placeholder="-- Chọn vị --"
+                />
+                
+                <div className="flex gap-2 items-end">
+                    <InputField 
+                        label={isExport ? "Số lượng (Hộp)" : "Số lượng (Hộp/Kg)"}
+                        icon={Package}
+                        type="number"
+                        wrapperClassName="flex-1"
+                        value={currentQuantity}
+                        onChange={e => setCurrentQuantity(e.target.value)}
+                    />
+                    <button 
+                        onClick={handleAdd}
+                        disabled={!currentFlavor || !currentQuantity}
+                        className="bg-brand-600 text-white h-[50px] px-4 rounded-xl font-bold mb-[1px] disabled:opacity-50"
+                    >
+                        Thêm
+                    </button>
+                </div>
+            </div>
+
+            {items.length > 0 && (
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="font-bold text-gray-700 mb-3">Danh sách</h3>
+                    <div className="space-y-2">
+                        {items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                <span className="font-medium text-gray-800">{item.flavor}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-bold text-brand-600">{item.quantity}</span>
+                                    <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-red-500"><X size={16}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <button
+                onClick={() => setShowConfirm(true)}
+                disabled={items.length === 0 || loading}
+                className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-xl hover:bg-brand-700 transition-colors disabled:bg-gray-400"
+            >
+                {loading ? <Loader2 className="animate-spin mx-auto"/> : 'XÁC NHẬN'}
+            </button>
+        </div>
+    );
+};
+
+interface DailyReportProps {
+  user: UserSession;
+  onBack: () => void;
+}
+
+const DailyReportView: React.FC<DailyReportProps> = ({ user, onBack }) => {
+    const [data, setData] = useState<DailyReportData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        getDailyReport(user.branch).then(d => {
+            setData(d);
+            setLoading(false);
+        });
+    }, [user.branch]);
+
+    if(loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-brand-600" /></div>;
+
+    if(!data) return <div className="text-center p-10">Không có dữ liệu.</div>;
+
+    return (
+        <div className="space-y-6">
+             <div className="flex items-center gap-2">
+                <button onClick={onBack} className="p-2 -ml-2 text-gray-600"><ArrowLeft /></button>
+                <h2 className="text-xl font-bold">Báo Cáo Ngày: {data.date}</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="bg-brand-50 p-4 rounded-2xl border border-brand-100">
+                    <p className="text-xs text-brand-600 font-bold uppercase">Tổng Doanh Thu</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">{data.totalCash.toLocaleString()} ₫</p>
+                </div>
+                 <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100">
+                    <p className="text-xs text-orange-600 font-bold uppercase">Tổng Hao Hụt</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">{data.totalShrinkage.toFixed(2)} kg</p>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gray-50 font-bold text-gray-700">Chi Tiết Nhập/Xuất/Tồn</div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-500 font-medium">
+                            <tr>
+                                <th className="p-3">Vị Kem</th>
+                                <th className="p-3 text-right">Nhập</th>
+                                <th className="p-3 text-right">Xuất</th>
+                                <th className="p-3 text-right">Hao hụt</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {data.inventoryDiff.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="p-3 font-medium text-gray-800">{item.flavor}</td>
+                                    <td className="p-3 text-right text-gray-600">{item.imported > 0 ? `+${item.imported}` : '-'}</td>
+                                    <td className="p-3 text-right text-gray-600">{item.exported > 0 ? `-${item.exported}` : '-'}</td>
+                                    <td className={`p-3 text-right font-bold ${item.shrinkage > 0.2 ? 'text-red-500' : 'text-green-600'}`}>
+                                        {item.shrinkage.toFixed(2)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // 9. Main App Component
