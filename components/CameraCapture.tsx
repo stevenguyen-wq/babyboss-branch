@@ -63,30 +63,47 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     try {
       let mediaStream: MediaStream | null = null;
       
-      // 1. Try requesting camera with specific facing mode
+      // 1. Try requesting camera with specific facing mode AND higher resolution
+      // Request 1080p (Full HD) or even higher if available for better OCR
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
             facingMode: facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 1920 }, // Prefer 1080p width
+            height: { ideal: 1080 } // Prefer 1080p height
           }
         });
       } catch (err) {
-        console.warn(`Constraint-based getUserMedia failed for ${facingMode}, retrying with basic config:`, err);
+        console.warn(`High-res constraint-based getUserMedia failed for ${facingMode}, retrying with basic config:`, err);
       }
 
-      // 2. Fallback: Request any video camera without constraints if specific failed
+      // 2. Fallback: Request 720p if 1080p fails
+      if (!mediaStream) {
+         try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: false,
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+         } catch (fallbackErr: any) {
+            console.warn("720p getUserMedia failed:", fallbackErr);
+         }
+      }
+
+      // 3. Ultimate Fallback: Just get any video stream
       if (!mediaStream) {
          try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ 
                 video: true,
                 audio: false 
             });
-         } catch (fallbackErr: any) {
-            console.error("Fallback getUserMedia failed:", fallbackErr);
-            throw fallbackErr; // Throw original or fallback error to outer catch
+         } catch (finalErr: any) {
+            console.error("Final fallback getUserMedia failed:", finalErr);
+            throw finalErr; 
          }
       }
       
@@ -141,7 +158,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         context.restore();
         
-        const imgData = canvas.toDataURL('image/jpeg', 0.85);
+        // Use high quality JPEG for OCR
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         setImage(imgData);
         onCapture(imgData);
         stopCamera();
